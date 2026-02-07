@@ -1,0 +1,1706 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liquid Glass Calendar</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.18);
+            --text-primary: rgba(255, 255, 255, 0.95);
+            --text-secondary: rgba(255, 255, 255, 0.7);
+            --accent-blue: rgba(10, 132, 255, 0.9);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            position: relative;
+            color: var(--text-primary);
+        }
+
+        /* Wallpaper */
+        .wallpaper {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background-image: url("{% static 'img/wallpaper.webp' %}");
+            background-size: cover;
+            background-position: center;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* Glass Panel */
+        .glass-panel {
+            background: var(--glass-bg);
+            backdrop-filter: blur(40px) saturate(180%);
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            padding: 18px;
+            transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+            overflow: hidden;
+        }
+
+        .glass-panel:hover {
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        /* Calendar */
+        .calendar-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .calendar-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .calendar-title {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #fff 0%, rgba(255, 255, 255, 0.7) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .calendar-nav {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .nav-btn, .today-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            padding: 6px 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: var(--text-primary);
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .today-btn {
+            background: linear-gradient(135deg, rgba(10, 132, 255, 0.9) 0%, rgba(52, 199, 89, 0.8) 100%);
+            box-shadow: 0 4px 15px rgba(10, 132, 255, 0.3);
+        }
+
+        .nav-btn:hover, .today-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Icon-only toggle buttons (e.g., snow) */
+        .icon-btn {
+            width: 28px;
+            height: 28px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            backdrop-filter: blur(18px) saturate(160%);
+            cursor: pointer;
+            transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            color: rgba(255, 255, 255, 0.92);
+            user-select: none;
+            padding: 0;
+        }
+
+        .icon-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .icon-btn:active {
+            transform: translateY(0px) scale(0.98);
+        }
+
+        /* OFF = subtle/secondary */
+        .snow-toggle.is-off {
+            opacity: 0.22;
+            background: rgba(255, 255, 255, 0.03);
+            border-color: rgba(255, 255, 255, 0.10);
+            box-shadow: none;
+            filter: grayscale(1);
+        }
+
+        /* ON = slightly lit and stays that way */
+        .snow-toggle.is-on {
+            opacity: 0.78;
+            background: rgba(255, 255, 255, 0.09);
+            border-color: rgba(255, 255, 255, 0.22);
+            box-shadow:
+                0 10px 26px rgba(255, 255, 255, 0.10),
+                0 0 0 2px rgba(255, 255, 255, 0.07) inset,
+                0 0 18px rgba(255, 255, 255, 0.10);
+            filter: none;
+        }
+
+        .snow-toggle svg {
+            width: 16px;
+            height: 16px;
+            display: block;
+            opacity: 0.95;
+        }
+
+        /* Logout icon button (subtle like the snow button) */
+        .logout-btn{
+            opacity: 0.22;
+            background: rgba(255, 255, 255, 0.03);
+            border-color: rgba(255, 255, 255, 0.10);
+            box-shadow: none;
+        }
+
+        .logout-btn:hover{
+            opacity: 0.78;
+            background: rgba(255, 255, 255, 0.09);
+            border-color: rgba(255, 255, 255, 0.22);
+            box-shadow:
+                0 10px 26px rgba(255, 255, 255, 0.10),
+                0 0 0 2px rgba(255, 255, 255, 0.07) inset,
+                0 0 18px rgba(255, 255, 255, 0.10);
+        }
+
+        .logout-btn svg{
+            width: 16px;
+            height: 16px;
+            display: block;
+            opacity: 0.95;
+        }
+
+        .calendar-weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            margin-bottom: 8px;
+        }
+
+        .weekday {
+            text-align: center;
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            padding: 5px 0;
+        }
+
+        .calendar-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            grid-auto-rows: 1fr;
+            gap: 5px;
+            flex: 1;
+        }
+
+        .day {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid transparent;
+            overflow: hidden;
+        }
+
+        .day:hover:not(.empty):not(.past-readonly) {
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(1.05);
+        }
+
+        .day.today {
+            background: var(--accent-blue);
+            font-weight: 700;
+            box-shadow: 0 4px 12px rgba(10, 132, 255, 0.4);
+        }
+
+        .day.today-pulse {
+            animation: todayPulse 520ms cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes todayPulse {
+            0%   { transform: scale(1); box-shadow: 0 4px 12px rgba(10, 132, 255, 0.35); }
+            40%  { transform: scale(1.12); box-shadow: 0 10px 28px rgba(10, 132, 255, 0.55); }
+            100% { transform: scale(1); box-shadow: 0 4px 12px rgba(10, 132, 255, 0.4); }
+        }
+
+        .day.past-readonly {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .day.empty, .day.other-month {
+            opacity: 0;
+            cursor: default;
+        }
+
+        /* Water-fill indicator for busy days */
+        .day::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(180deg, transparent, rgba(255, 69, 58, 0.6));
+            height: 0%;
+            transition: height 0.3s ease;
+            z-index: 0;
+            border-radius: 0 0 12px 12px;
+        }
+
+        .day span {
+            position: relative;
+            z-index: 1;
+        }
+
+        .day.task-low::before { height: 25%; background: linear-gradient(180deg, transparent, rgba(52, 199, 89, 0.4)); }
+        .day.task-medium::before { height: 50%; background: linear-gradient(180deg, transparent, rgba(255, 204, 0, 0.5)); }
+        .day.task-high::before { height: 75%; background: linear-gradient(180deg, transparent, rgba(255, 69, 58, 0.6)); }
+
+        /* Habit Tracker - Horizontal Strip */
+        .habit-tracker {
+            padding: 12px 18px;
+        }
+
+        .habit-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 140px;
+            overflow-y: auto;
+        }
+
+        .habit-list::-webkit-scrollbar { width: 3px; }
+        .habit-list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
+
+        .habit-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 8px 12px;
+            transition: all 0.3s ease;
+        }
+
+        .habit-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .habit-name {
+            font-size: 12px;
+            font-weight: 600;
+            min-width: 100px;
+            max-width: 150px;
+            cursor: text;
+            padding: 2px 4px;
+            border-radius: 4px;
+            outline: none;
+            border: 1px solid transparent;
+        }
+
+        .habit-name:focus {
+            border-color: var(--accent-blue);
+            background: rgba(0, 0, 0, 0.15);
+        }
+
+        .habit-days-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .habit-days {
+            display: flex;
+            gap: 4px;
+        }
+
+        .habit-day {
+            width: 30px;
+            height: 30px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            cursor: pointer;
+            transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.88);
+            position: relative;
+            user-select: none;
+        }
+
+        .habit-day .habit-day-label {
+            opacity: 0.92;
+            letter-spacing: -0.2px;
+        }
+
+        .habit-day.today {
+            border-color: rgba(10, 132, 255, 0.9);
+            box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.25), 0 10px 24px rgba(10, 132, 255, 0.10);
+        }
+
+        .habit-day:hover:not(.future) {
+            transform: scale(1.15);
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .habit-day.completed {
+            background: linear-gradient(135deg, rgba(52, 199, 89, 0.72), rgba(52, 199, 89, 0.38));
+            border-color: rgba(52, 199, 89, 0.65);
+            box-shadow: 0 10px 22px rgba(52, 199, 89, 0.10);
+        }
+
+        .habit-day.missed {
+            background: linear-gradient(135deg, rgba(255, 69, 58, 0.30), rgba(255, 69, 58, 0.16));
+            border-color: rgba(255, 69, 58, 0.45);
+        }
+
+        .habit-day.future {
+            opacity: 0.14;
+            cursor: default;
+        }
+
+        /* Past days are read-only (can’t be changed after the day passes) */
+        .habit-day.locked {
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
+
+        .habit-day.completed::after {
+            content: '✓';
+            position: absolute;
+            right: -4px;
+            top: -5px;
+            width: 16px;
+            height: 16px;
+            border-radius: 999px;
+            background: rgba(52, 199, 89, 0.95);
+            color: rgba(0, 0, 0, 0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 900;
+            box-shadow: 0 10px 18px rgba(52, 199, 89, 0.18);
+        }
+
+        .habit-day.missed::after {
+            content: '✕';
+            position: absolute;
+            right: -4px;
+            top: -5px;
+            width: 16px;
+            height: 16px;
+            border-radius: 999px;
+            background: rgba(255, 69, 58, 0.80);
+            color: rgba(255, 255, 255, 0.92);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 900;
+            box-shadow: 0 10px 18px rgba(255, 69, 58, 0.12);
+        }
+
+        .habit-controls {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            justify-content: flex-end;
+            line-height: 1;
+            height: 22px;
+        }
+
+        .habit-nav, .habit-delete {
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 11px;
+            line-height: 1;
+            transition: all 0.3s ease;
+        }
+
+        .habit-nav:hover { background: rgba(255, 255, 255, 0.12); }
+        .habit-nav:disabled { opacity: 0.2; cursor: not-allowed; }
+
+        .habit-delete {
+            background: rgba(255, 69, 58, 0.12);
+            color: rgba(255, 69, 58, 0.85);
+            margin-top: 0;
+        }
+
+        .habit-delete:hover { background: rgba(255, 69, 58, 0.25); }
+        .habit-delete.confirm { background: rgba(255, 69, 58, 0.5); }
+
+        .habit-stats {
+            font-size: 10px;
+            color: var(--text-secondary);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 22px;
+            line-height: 22px;
+        }
+
+        .habit-stats span {
+            display: inline-flex;
+            align-items: center;
+            height: 22px;
+            line-height: 22px;
+            white-space: nowrap;
+        }
+
+        .add-habit-btn {
+            background: linear-gradient(135deg, rgba(10, 132, 255, 0.15), rgba(52, 199, 89, 0.15));
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 6px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 8px;
+        }
+
+        .add-habit-btn:hover {
+            background: linear-gradient(135deg, rgba(10, 132, 255, 0.25), rgba(52, 199, 89, 0.25));
+            transform: translateY(-2px);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 320px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .task-panel {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-header {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge {
+            background: rgba(255, 255, 255, 0.15);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 11px;
+        }
+
+        .task-list {
+            overflow-y: auto;
+            overflow-x: hidden;
+            max-height: 300px;
+            padding-right: 6px; /* keeps content from touching the vertical scrollbar */
+        }
+
+        .task-list::-webkit-scrollbar { width: 4px; }
+        .task-list::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
+
+        .task-item {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+            overflow: hidden;
+        }
+
+        .task-item:hover {
+            background: rgba(255, 255, 255, 0.12);
+            transform: translateX(5px);
+            will-change: transform;
+        }
+
+        .task-item.completed {
+          opacity: 0.28; /* B: heavily dimmed */
+        }
+
+        .task-item.exiting { pointer-events: none; }
+
+        .task-item.entering {
+            opacity: 0;
+            transform: translateY(-10px) scale(0.98);
+        }
+
+        .task-item.entering.entered {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            transition: opacity 260ms ease, transform 260ms ease;
+        }
+
+        .task-checkbox {
+            width: 18px;
+            height: 18px;
+            border-radius: 5px;
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            flex: 0 0 18px;
+            min-width: 18px;
+        }
+
+        .task-checkbox:hover { border-color: var(--accent-blue); }
+        .task-checkbox.checked {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .task-checkbox.checked::after {
+            content: '✓';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 12px;
+        }
+
+        .task-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .task-text {
+            font-size: 13px;
+            font-weight: 500;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: text;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+
+        .task-text.task-editing {
+            outline: none;
+            background: rgba(0, 0, 0, 0.18);
+            border: 1px solid rgba(10, 132, 255, 0.55);
+            border-radius: 8px;
+            padding: 3px 6px;
+            margin-left: -6px;
+            margin-right: -6px;
+            white-space: normal;
+            overflow: visible;
+            text-overflow: clip;
+        }
+
+        .task-text.completed { text-decoration: line-through; }
+
+        .task-date {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .task-delete {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            background: rgba(255, 69, 58, 0.2);
+            color: rgba(255, 69, 58, 0.9);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            flex: 0 0 24px;
+            min-width: 24px;
+        }
+
+        .task-delete:hover {
+            background: rgba(255, 69, 58, 0.4);
+            transform: scale(1.1);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .empty-state-icon {
+            font-size: 40px;
+            margin-bottom: 8px;
+            opacity: 0.5;
+        }
+
+        /* Task Modal */
+        .task-modal {
+            position: absolute;
+            display: none;
+            background: var(--glass-bg);
+            backdrop-filter: blur(40px) saturate(180%);
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            width: 260px;
+            z-index: 1000;
+        }
+
+        .task-modal.show { display: block; }
+
+        .modal-header {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .task-input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 8px 12px;
+            color: var(--text-primary);
+            font-size: 13px;
+            margin-bottom: 10px;
+        }
+
+        .task-input:focus {
+            outline: none;
+            border-color: var(--accent-blue);
+        }
+
+        .modal-task-list {
+            max-height: 150px;
+            min-height: 40px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+
+        .modal-task-item {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            padding: 6px 8px;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 6px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: var(--accent-blue);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(10, 132, 255, 0.4);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            display: none;
+            z-index: 999;
+        }
+
+        .overlay.show { display: block; }
+    </style>
+</head>
+<body>
+    <div class="wallpaper"></div>
+
+    <div class="container">
+        <div class="main-content">
+            <!-- Calendar -->
+            <div class="glass-panel calendar-panel">
+                <div class="calendar-header">
+                    <div class="calendar-left">
+                        <button class="icon-btn snow-toggle is-on" id="snowToggleBtn" type="button" aria-label="Toggle snow" title="Snow">
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <path d="M12 2v20" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                <path d="M4 6l16 12" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                <path d="M20 6L4 18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+
+                                <!-- small branches -->
+                                <path d="M12 6.2l-1.6-1.2M12 6.2l1.6-1.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                <path d="M12 17.8l-1.6 1.2M12 17.8l1.6 1.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+
+                                <path d="M7.1 9.2l-1.9.2M7.1 9.2l.7-1.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                <path d="M16.9 14.8l1.9-.2M16.9 14.8l-.7 1.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+
+                                <path d="M16.9 9.2l1.9.2M16.9 9.2l-.7-1.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                <path d="M7.1 14.8l-1.9-.2M7.1 14.8l.7 1.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+
+                                <circle cx="12" cy="12" r="1.2" stroke="currentColor" stroke-width="1.7"/>
+                            </svg>
+                        </button>
+                        <div class="calendar-title" id="currentMonth">February 2026</div>
+                    </div>
+                    <div class="calendar-nav">
+                        <div class="today-btn" onclick="goToToday()">● Today</div>
+                        <div class="nav-btn" onclick="previousMonth()">‹</div>
+                        <div class="nav-btn" onclick="nextMonth()">›</div>
+                        <a class="icon-btn logout-btn" href="{% url 'logout' %}" aria-label="Log out" title="Log out">
+                            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                                <path d="M10 7V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2v-1" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M13 12H4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+                                <path d="M7 9l-3 3 3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="calendar-weekdays">
+                    <div class="weekday">Sun</div>
+                    <div class="weekday">Mon</div>
+                    <div class="weekday">Tue</div>
+                    <div class="weekday">Wed</div>
+                    <div class="weekday">Thu</div>
+                    <div class="weekday">Fri</div>
+                    <div class="weekday">Sat</div>
+                </div>
+
+                <div class="calendar-days" id="calendarDays"></div>
+            </div>
+
+            <!-- Habit Tracker - Horizontal Strip -->
+            <div class="glass-panel habit-tracker">
+                <div class="habit-list" id="habitList">
+                    <div class="empty-state" style="padding: 15px;">
+                        <div class="empty-state-icon">📊</div>
+                        <div>No habits yet</div>
+                    </div>
+                </div>
+                <div class="add-habit-btn" id="addHabitBtn">+ Add Habit</div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="glass-panel task-panel" style="flex: 1;">
+                <div class="panel-header">
+                    Today's Tasks
+                    <span class="badge" id="todayCount">0</span>
+                </div>
+                <div class="task-list" id="todayTasks">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <div>No tasks for today</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-panel task-panel" style="flex: 1;">
+                <div class="panel-header">
+                    Coming Days
+                    <span class="badge" id="upcomingCount">0</span>
+                </div>
+                <div class="task-list" id="upcomingTasks">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📅</div>
+                        <div>No upcoming tasks</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Modal -->
+    <div class="overlay" id="overlay" onclick="closeModal()"></div>
+    <div class="task-modal" id="taskModal">
+        <div class="modal-header" id="modalTitle">Add Task</div>
+        <input type="text" class="task-input" id="taskInput" placeholder="Enter task..." />
+        <div class="modal-task-list" id="modalTaskList">
+            <div style="text-align: center; padding: 10px; font-size: 11px; color: rgba(255,255,255,0.5);">No tasks yet</div>
+        </div>
+        <div class="modal-buttons">
+            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="addTask()">Add</button>
+        </div>
+    </div>
+
+    <script>
+        let currentDate = new Date();
+        let selectedDate = null;
+        const USER_ID = "{{ request.user.id|default:'anon' }}";
+        const TASKS_KEY = `calendarTasks_user_${USER_ID}`;
+
+        let tasks = JSON.parse(localStorage.getItem(TASKS_KEY)) || {};
+        const HABITS_KEY = `habits_user_${USER_ID}`;
+        let habits = JSON.parse(localStorage.getItem(HABITS_KEY)) || [];
+
+        // Make snow preference per-user as well (prevents cross-user bleed on shared browser)
+        const SAFE_USER_ID = (USER_ID && USER_ID !== 'None') ? USER_ID : 'anon';
+        const SNOW_KEY = `snow_enabled_user_${SAFE_USER_ID}`;
+        let lastMovedTaskId = null;
+
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        const monthNames = ["January", "February", "March", "April", "May", "June",
+            "July", "August", "September", "October", "November", "December"];
+
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+
+            document.getElementById('currentMonth').textContent = `${monthNames[month]} ${year}`;
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+            const calendarDays = document.getElementById('calendarDays');
+            calendarDays.innerHTML = '';
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            // Previous month days
+            for (let i = firstDay - 1; i >= 0; i--) {
+                const day = daysInPrevMonth - i;
+                const dayEl = createDayElement(day, true, year, month - 1);
+                calendarDays.appendChild(dayEl);
+            }
+
+            // Current month days
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayEl = createDayElement(day, false, year, month);
+                const dateKey = `${year}-${month}-${day}`;
+                const dayDate = new Date(year, month, day);
+                dayDate.setHours(0, 0, 0, 0);
+
+                if (dayDate.getTime() === today.getTime()) {
+                    dayEl.classList.add('today');
+                }
+
+                if (dayDate < today) {
+                    dayEl.classList.add('past-readonly');
+                }
+
+                // Water-fill indicator
+                if (tasks[dateKey] && tasks[dateKey].length > 0) {
+                    const activeTasks = tasks[dateKey].filter(t => !t.completed);
+                    const count = activeTasks.length;
+
+                    if (count > 0) {
+                        if (count <= 2) dayEl.classList.add('task-low');
+                        else if (count <= 4) dayEl.classList.add('task-medium');
+                        else dayEl.classList.add('task-high');
+                    }
+                }
+
+                calendarDays.appendChild(dayEl);
+            }
+
+            // Next month days
+            const totalCells = firstDay + daysInMonth;
+            const remainingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+            for (let day = 1; day <= remainingCells; day++) {
+                const dayEl = createDayElement(day, true, year, month + 1);
+                calendarDays.appendChild(dayEl);
+            }
+
+            updateTodayTasks();
+            updateUpcomingTasks();
+        }
+
+        function createDayElement(day, isOtherMonth, year, month) {
+            const dayEl = document.createElement('div');
+            dayEl.className = 'day';
+            dayEl.innerHTML = `<span>${day}</span>`;
+
+            if (isOtherMonth) {
+                dayEl.classList.add('other-month');
+            } else {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const dayDate = new Date(year, month, day);
+                dayDate.setHours(0, 0, 0, 0);
+
+                if (dayDate >= today) {
+                    dayEl.onclick = (e) => openTaskModal(year, month, day, e);
+                }
+            }
+
+            return dayEl;
+        }
+
+        function previousMonth() {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            renderCalendar();
+        }
+
+        function nextMonth() {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            renderCalendar();
+        }
+
+        function goToToday() {
+            currentDate = new Date();
+            renderCalendar();
+            pulseTodayCell();
+        }
+
+        function pulseTodayCell() {
+            const el = document.querySelector('.day.today');
+            if (!el) return;
+
+            // Restart CSS animation reliably
+            el.classList.remove('today-pulse');
+            void el.offsetWidth; // force reflow
+            el.classList.add('today-pulse');
+
+            // Cleanup so the next click can re-trigger
+            setTimeout(() => {
+                el.classList.remove('today-pulse');
+            }, 650);
+        }
+
+        function openTaskModal(year, month, day, event) {
+            selectedDate = { year, month, day };
+            const dateKey = `${year}-${month}-${day}`;
+
+            const modal = document.getElementById('taskModal');
+            const overlay = document.getElementById('overlay');
+            const input = document.getElementById('taskInput');
+
+            document.getElementById('modalTitle').textContent = `${monthNames[month]} ${day}`;
+            input.value = '';
+
+            updateModalTaskList(dateKey);
+
+            const rect = event.target.getBoundingClientRect();
+            const modalWidth = 260;
+            const modalHeight = 250;
+
+            let left = rect.left + (rect.width / 2) - (modalWidth / 2);
+            let top = rect.bottom + 10;
+
+            if (left + modalWidth > window.innerWidth - 20) left = window.innerWidth - modalWidth - 20;
+            if (left < 20) left = 20;
+            if (top + modalHeight > window.innerHeight - 20) top = rect.top - modalHeight - 10;
+
+            modal.style.left = left + 'px';
+            modal.style.top = top + 'px';
+
+            modal.classList.add('show');
+            overlay.classList.add('show');
+
+            setTimeout(() => input.focus(), 100);
+        }
+
+        function closeModal() {
+            document.getElementById('taskModal').classList.remove('show');
+            document.getElementById('overlay').classList.remove('show');
+            selectedDate = null;
+        }
+
+        function addTask() {
+            const input = document.getElementById('taskInput');
+            const taskText = input.value.trim();
+
+            if (!taskText || !selectedDate) return;
+
+            const { year, month, day } = selectedDate;
+            const dateKey = `${year}-${month}-${day}`;
+
+            if (!tasks[dateKey]) tasks[dateKey] = [];
+
+            tasks[dateKey].push({
+                id: Date.now(),
+                text: taskText,
+                completed: false,
+                date: new Date(year, month, day).toISOString()
+            });
+
+            localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+
+            input.value = '';
+            updateModalTaskList(dateKey);
+            renderCalendar();
+        }
+
+        function updateModalTaskList(dateKey) {
+            const modalTaskList = document.getElementById('modalTaskList');
+            const dateTasks = tasks[dateKey] ? tasks[dateKey].filter(t => !t.completed) : [];
+
+            if (dateTasks.length === 0) {
+                modalTaskList.innerHTML = '<div style="text-align: center; padding: 10px; font-size: 11px; color: rgba(255,255,255,0.5);">No tasks yet</div>';
+            } else {
+                modalTaskList.innerHTML = dateTasks.map(task => `
+                    <div class="modal-task-item">
+                        <div style="flex: 1;">${escapeHtml(task.text)}</div>
+                        <div style="cursor: pointer; color: rgba(255, 69, 58, 0.9);" onclick="deleteTaskFromModal('${dateKey}', ${task.id})">×</div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function deleteTaskFromModal(dateKey, taskId) {
+            tasks[dateKey] = tasks[dateKey].filter(t => t.id !== taskId);
+            if (tasks[dateKey].length === 0) delete tasks[dateKey];
+            localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+            updateModalTaskList(dateKey);
+            renderCalendar();
+        }
+
+        function updateTodayTasks() {
+            const today = new Date();
+            const dateKey = `${today.getFullYear()}-${today.getMonth()}-${today.getDate()}`;
+            const todayTasksEl = document.getElementById('todayTasks');
+            const todayTasks = tasks[dateKey] ? tasks[dateKey].filter(t => !t.completed) : [];
+            const completedTasks = tasks[dateKey] ? tasks[dateKey].filter(t => t.completed) : [];
+
+            document.getElementById('todayCount').textContent = todayTasks.length;
+
+            if (todayTasks.length === 0 && completedTasks.length === 0) {
+                todayTasksEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><div>No tasks for today</div></div>';
+            } else {
+                todayTasksEl.innerHTML = [...todayTasks, ...completedTasks].map(task => createTaskHTML(task, dateKey)).join('');
+            }
+            triggerEnterAnimations();
+        }
+
+        function updateUpcomingTasks() {
+            const upcomingTasksEl = document.getElementById('upcomingTasks');
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            let upcomingTasks = [];
+
+            for (let dateKey in tasks) {
+                const taskDate = parseDateKey(dateKey);
+                taskDate.setHours(0, 0, 0, 0);
+
+                if (taskDate > today) {
+                    const futureTasks = tasks[dateKey].filter(t => !t.completed);
+                    upcomingTasks.push(...futureTasks.map(t => ({ ...t, dateKey })));
+                }
+            }
+
+            upcomingTasks.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+            document.getElementById('upcomingCount').textContent = upcomingTasks.length;
+
+            if (upcomingTasks.length === 0) {
+                upcomingTasksEl.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📅</div><div>No upcoming tasks</div></div>';
+            } else {
+                upcomingTasksEl.innerHTML = upcomingTasks.slice(0, 20).map(task => createTaskHTML(task, task.dateKey)).join('');
+            }
+            triggerEnterAnimations();
+        }
+
+        function parseDateKey(dateKey) {
+            const parts = dateKey.split('-');
+            return new Date(parseInt(parts[0]), parseInt(parts[1]), parseInt(parts[2]));
+        }
+
+        function createTaskHTML(task, dateKey) {
+            const date = new Date(task.date);
+            const dateStr = `${monthNames[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+
+            return `
+                <div class="task-item ${task.completed ? 'completed' : ''} ${task.id === lastMovedTaskId ? 'entering' : ''}" data-task-id="${task.id}">
+                    <div class="task-checkbox ${task.completed ? 'checked' : ''}"
+                         onclick="toggleTask('${dateKey}', ${task.id}, this)"></div>
+                    <div class="task-content">
+                        <div class="task-text ${task.completed ? 'completed' : ''}" tabindex="0" data-datekey="${dateKey}" data-taskid="${task.id}">${escapeHtml(task.text)}</div>
+                        <div class="task-date">${dateStr}</div>
+                    </div>
+                    <div class="task-delete" onclick="deleteTask('${dateKey}', ${task.id})">×</div>
+                </div>
+            `;
+        }
+
+        function toggleTask(dateKey, taskId, checkboxEl) {
+            const task = tasks[dateKey].find(t => t.id === taskId);
+            if (!task) return;
+
+            const row = checkboxEl ? checkboxEl.closest('.task-item') : null;
+            if (!row) {
+                task.completed = !task.completed;
+                localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+                lastMovedTaskId = taskId;
+                renderCalendar();
+                return;
+            }
+
+            const startHeight = row.offsetHeight;
+            row.style.height = startHeight + 'px';
+            row.style.marginBottom = getComputedStyle(row).marginBottom;
+            row.style.paddingTop = getComputedStyle(row).paddingTop;
+            row.style.paddingBottom = getComputedStyle(row).paddingBottom;
+
+            row.classList.add('exiting');
+            row.style.transition = 'opacity 180ms ease, transform 180ms ease, height 220ms ease, margin 220ms ease, padding 220ms ease';
+
+            requestAnimationFrame(() => {
+                row.style.opacity = '0';
+                row.style.transform = 'translateY(-6px) scale(0.98)';
+                row.style.height = '0px';
+                row.style.marginBottom = '0px';
+                row.style.paddingTop = '0px';
+                row.style.paddingBottom = '0px';
+            });
+
+            const onDone = () => {
+                task.completed = !task.completed;
+                localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+
+                lastMovedTaskId = taskId;
+                renderCalendar();
+                setTimeout(() => { lastMovedTaskId = null; }, 350);
+            };
+
+            row.addEventListener('transitionend', onDone, { once: true });
+        }
+
+        function triggerEnterAnimations() {
+            const entering = document.querySelectorAll('.task-item.entering');
+            if (entering.length === 0) return;
+            requestAnimationFrame(() => {
+                entering.forEach(el => el.classList.add('entered'));
+            });
+        }
+
+        function deleteTask(dateKey, taskId) {
+            tasks[dateKey] = tasks[dateKey].filter(t => t.id !== taskId);
+            if (tasks[dateKey].length === 0) delete tasks[dateKey];
+            localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+            renderCalendar();
+        }
+
+        function updateTaskText(dateKey, taskId, el) {
+            if (!el) return;
+
+            const raw = (el.textContent || '').trim();
+            const prev = (el.dataset.prev || '').trim();
+
+            // Don’t allow empty names: revert to previous
+            if (!raw) {
+                el.textContent = prev || '';
+                return;
+            }
+
+            // Save if changed
+            if (!tasks[dateKey]) return;
+            const t = tasks[dateKey].find(x => x.id === taskId);
+            if (!t) return;
+
+            if (t.text !== raw) {
+                t.text = raw;
+                localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
+            }
+        }
+
+        let activeTaskEditEl = null;
+
+        function beginTaskEdit(el) {
+            if (!el) return;
+            if (activeTaskEditEl && activeTaskEditEl !== el) {
+                commitTaskEdit(activeTaskEditEl);
+            }
+
+            // Don’t allow editing while completed (optional safety)
+            if (el.classList.contains('completed')) return;
+
+            el.dataset.prev = el.textContent;
+            el.setAttribute('contenteditable', 'true');
+            el.classList.add('task-editing');
+            el.focus();
+
+            // Cursor at end
+            const range = document.createRange();
+            range.selectNodeContents(el);
+            range.collapse(false);
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+
+            activeTaskEditEl = el;
+        }
+
+        function commitTaskEdit(el) {
+            if (!el) return;
+            const dateKey = el.dataset.datekey;
+            const taskId = parseInt(el.dataset.taskid, 10);
+
+            el.setAttribute('contenteditable', 'false');
+            el.classList.remove('task-editing');
+
+            if (!dateKey || Number.isNaN(taskId)) {
+                activeTaskEditEl = null;
+                return;
+            }
+
+            updateTaskText(dateKey, taskId, el);
+            activeTaskEditEl = null;
+        }
+
+        function cancelTaskEdit(el) {
+            if (!el) return;
+            el.textContent = (el.dataset.prev || '').trim();
+            el.setAttribute('contenteditable', 'false');
+            el.classList.remove('task-editing');
+            activeTaskEditEl = null;
+        }
+
+        // Delegated click-to-edit (works after every render)
+        document.addEventListener('click', (e) => {
+            const el = e.target.closest('.task-text');
+            if (!el) return;
+
+            // Ignore if clicked inside buttons/checkbox areas
+            if (e.target.closest('.task-checkbox') || e.target.closest('.task-delete')) return;
+
+            beginTaskEdit(el);
+        });
+
+        // Save on click outside
+        document.addEventListener('mousedown', (e) => {
+            if (!activeTaskEditEl) return;
+            if (activeTaskEditEl.contains(e.target)) return;
+            commitTaskEdit(activeTaskEditEl);
+        });
+
+        // Enter = save, Esc = cancel
+        document.addEventListener('keydown', (e) => {
+            if (!activeTaskEditEl) return;
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                commitTaskEdit(activeTaskEditEl);
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                cancelTaskEdit(activeTaskEditEl);
+            }
+        });
+
+        // Habit Tracker Functions
+
+        function normalizeHabitHistory(habit) {
+            if (!habit) return false;
+            if (!habit.completedDays) habit.completedDays = {};
+
+            const startDate = new Date(habit.startDate);
+            startDate.setHours(0, 0, 0, 0);
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const daysSinceStart = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+            if (daysSinceStart <= 0) return false;
+
+            let changed = false;
+
+            // For every day strictly before today: if not explicitly completed, mark as missed.
+            for (let i = 0; i < daysSinceStart; i++) {
+                const d = new Date(startDate);
+                d.setDate(d.getDate() + i);
+                d.setHours(0, 0, 0, 0);
+
+                const key = formatDateKey(d);
+                if (habit.completedDays[key] === undefined) {
+                    habit.completedDays[key] = false;
+                    changed = true;
+                }
+            }
+
+            return changed;
+        }
+        document.getElementById('addHabitBtn').addEventListener('click', addNewHabit);
+
+        function addNewHabit() {
+            const habitName = prompt('Enter habit name:');
+            if (!habitName || !habitName.trim()) return;
+
+            habits.push({
+                id: Date.now(),
+                name: habitName.trim(),
+                startDate: new Date().toISOString(),
+                currentPage: 0,
+                completedDays: {}
+            });
+
+            saveHabits();
+            renderHabits();
+        }
+
+        function renderHabits() {
+            const habitList = document.getElementById('habitList');
+
+            if (habits.length === 0) {
+                habitList.innerHTML = '<div class="empty-state" style="padding: 15px;"><div class="empty-state-icon">📊</div><div>No habits yet</div></div>';
+                return;
+            }
+
+            // Auto-lock past days by marking any unfilled past day as missed (x)
+            let dirty = false;
+            habits.forEach(h => { if (normalizeHabitHistory(h)) dirty = true; });
+            if (dirty) saveHabits();
+
+            habitList.innerHTML = habits.map(habit => createHabitHTML(habit)).join('');
+        }
+
+        function createHabitHTML(habit) {
+            const startDate = new Date(habit.startDate);
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            startDate.setHours(0, 0, 0, 0);
+
+            const daysSinceStart = Math.floor((today - startDate) / (1000 * 60 * 60 * 24));
+            const currentPage = habit.currentPage || 0;
+            const startDay = currentPage * 10;
+            const days = [];
+
+            let streak = 0;
+            let currentStreak = 0;
+
+            for (let i = 0; i < 10; i++) {
+                const dayOffset = startDay + i;
+                const date = new Date(startDate);
+                date.setDate(date.getDate() + dayOffset);
+                date.setHours(0, 0, 0, 0);
+
+                const dateKey = formatDateKey(date);
+                const isCompleted = habit.completedDays[dateKey] === true;
+                const isMissed = habit.completedDays[dateKey] === false;
+                const isFuture = date > today;
+                const isLocked = date < today; // past days are immutable
+
+                let className = 'habit-day';
+                if (isFuture) className += ' future';
+                else if (isLocked) className += ' locked';
+
+                if (isCompleted) className += ' completed';
+                else if (isMissed) className += ' missed';
+
+                if (dateKey === formatDateKey(today)) className += ' today';
+
+                const dayNum = dayOffset + 1;
+                const canToggle = !isFuture && !isLocked; // only today is editable
+
+                days.push(
+                    `<div class="${className}" onclick="${canToggle ? `toggleHabitDay(${habit.id}, '${dateKey}')` : ''}" title="${date.toDateString()}">` +
+                    `<span class="habit-day-label">${(dayNum % 100).toString().padStart(2,'0')}</span>` +
+                    `</div>`
+                );
+
+                if (dayOffset <= daysSinceStart) {
+                    if (isCompleted) {
+                        currentStreak++;
+                        if (currentStreak > streak) streak = currentStreak;
+                    } else if (isMissed) {
+                        currentStreak = 0;
+                    }
+                }
+            }
+
+            const canGoPrev = currentPage > 0;
+            const canGoNext = startDay + 10 <= daysSinceStart;
+            const showNavigation = daysSinceStart >= 10;
+
+            return `
+                <div class="habit-item">
+                    <div class="habit-name" contenteditable="true"
+                         onblur="updateHabitName(${habit.id}, this.textContent)"
+                         onkeydown="if(event.key === 'Enter') { event.preventDefault(); this.blur(); }">${habit.name}</div>
+                    <div class="habit-days-container">
+                        ${showNavigation ? `<div class="habit-nav ${!canGoPrev ? 'disabled' : ''}" onclick="${canGoPrev ? `changeHabitPage(${habit.id}, -1)` : ''}" ${!canGoPrev ? 'disabled' : ''}>‹</div>` : ''}
+                        <div class="habit-days">${days.join('')}</div>
+                        ${showNavigation ? `<div class="habit-nav ${!canGoNext ? 'disabled' : ''}" onclick="${canGoNext ? `changeHabitPage(${habit.id}, 1)` : ''}" ${!canGoNext ? 'disabled' : ''}>›</div>` : ''}
+                    </div>
+                    <div class="habit-controls">
+                        <div class="habit-stats"><span>🔥 ${streak}</span> <span>${Math.min(startDay + 10, daysSinceStart + 1)}d</span></div>
+                        <div class="habit-delete" id="delete-${habit.id}" onclick="deleteHabit(${habit.id})">🗑</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function formatDateKey(date) {
+            return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+        }
+
+        function toggleHabitDay(habitId, dateKey) {
+            const habit = habits.find(h => h.id === habitId);
+            if (!habit) return;
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const d = parseDateKey(dateKey);
+            d.setHours(0, 0, 0, 0);
+
+            // Past days are read-only
+            if (d < today) return;
+
+            if (!habit.completedDays) habit.completedDays = {};
+
+            if (habit.completedDays[dateKey] === undefined) {
+                habit.completedDays[dateKey] = true;
+            } else if (habit.completedDays[dateKey] === true) {
+                habit.completedDays[dateKey] = false;
+            } else {
+                delete habit.completedDays[dateKey];
+            }
+
+            saveHabits();
+            renderHabits();
+        }
+
+        function changeHabitPage(habitId, direction) {
+            const habit = habits.find(h => h.id === habitId);
+            if (!habit) return;
+
+            habit.currentPage = (habit.currentPage || 0) + direction;
+            if (habit.currentPage < 0) habit.currentPage = 0;
+
+            saveHabits();
+            renderHabits();
+        }
+
+        function updateHabitName(habitId, newName) {
+            const habit = habits.find(h => h.id === habitId);
+            if (!habit || !newName.trim()) {
+                renderHabits();
+                return;
+            }
+
+            habit.name = newName.trim();
+            saveHabits();
+        }
+
+        let deleteConfirmation = {};
+
+        function deleteHabit(habitId) {
+            const habit = habits.find(h => h.id === habitId);
+            if (!habit) return;
+
+            const deleteBtn = document.getElementById(`delete-${habitId}`);
+
+            if (!deleteConfirmation[habitId]) {
+                deleteConfirmation[habitId] = true;
+                deleteBtn.classList.add('confirm');
+                deleteBtn.innerHTML = '✓';
+
+                setTimeout(() => {
+                    if (deleteConfirmation[habitId]) {
+                        delete deleteConfirmation[habitId];
+                        deleteBtn.classList.remove('confirm');
+                        deleteBtn.innerHTML = '🗑';
+                    }
+                }, 3000);
+                return;
+            }
+
+            if (confirm(`Are you sure you want to delete "${habit.name}"?`)) {
+                habits = habits.filter(h => h.id !== habitId);
+                delete deleteConfirmation[habitId];
+                saveHabits();
+                renderHabits();
+            } else {
+                delete deleteConfirmation[habitId];
+                deleteBtn.classList.remove('confirm');
+                deleteBtn.innerHTML = '🗑';
+            }
+        }
+
+        function saveHabits() {
+            localStorage.setItem(HABITS_KEY, JSON.stringify(habits));
+        }
+
+        function setSnowButtonState(enabled) {
+            const btn = document.getElementById('snowToggleBtn');
+            if (!btn) return;
+            btn.classList.toggle('is-on', !!enabled);
+            btn.classList.toggle('is-off', !enabled);
+        }
+
+        function setSnowCanvasEnabled(enabled) {
+            const canvas = document.getElementById('snowCanvas');
+            if (!canvas) return;
+            canvas.style.opacity = enabled ? '1' : '0';
+            // keep it non-interactive and behind UI
+            canvas.style.pointerEvents = 'none';
+            canvas.style.zIndex = '0';
+        }
+
+        function getStoredSnowEnabled() {
+            // Prefer per-user, fallback to a global key (covers pages where user id isn't available)
+            const storedUser = localStorage.getItem(SNOW_KEY);
+            if (storedUser !== null) return storedUser === '1';
+
+            const storedGlobal = localStorage.getItem('snow_enabled_global');
+            return storedGlobal === null ? true : storedGlobal === '1';
+        }
+
+        function storeSnowEnabled(enabled) {
+            const v = enabled ? '1' : '0';
+            localStorage.setItem(SNOW_KEY, v);
+            localStorage.setItem('snow_enabled_global', v);
+        }
+
+        function initSnowPreference() {
+            const btn = document.getElementById('snowToggleBtn');
+            if (!btn) return;
+
+            const initial = getStoredSnowEnabled();
+
+            // Prefer Snow API (from snow.js). Fallback: canvas fade.
+            if (window.Snow && typeof window.Snow.setEnabled === 'function') {
+                window.Snow.setEnabled(initial);
+                // Sync storage with actual state
+                storeSnowEnabled(window.Snow.isEnabled());
+                setSnowButtonState(window.Snow.isEnabled());
+            } else {
+                setSnowCanvasEnabled(initial);
+                setSnowButtonState(initial);
+                storeSnowEnabled(initial);
+            }
+
+            // Ensure we don't double-bind
+            if (!btn.dataset.boundSnow) {
+                btn.dataset.boundSnow = '1';
+                btn.addEventListener('click', () => {
+                    let enabled;
+                    if (window.Snow && typeof window.Snow.toggle === 'function') {
+                        enabled = window.Snow.toggle();
+                    } else {
+                        enabled = !getStoredSnowEnabled();
+                        setSnowCanvasEnabled(enabled);
+                    }
+                    storeSnowEnabled(enabled);
+                    setSnowButtonState(enabled);
+                });
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // If snow.js is already loaded, init immediately. Otherwise wait for it.
+            const snowScript = document.getElementById('snowScript');
+            if (window.Snow) {
+                initSnowPreference();
+            } else if (snowScript) {
+                snowScript.addEventListener('load', initSnowPreference, { once: true });
+                // Safety: if load already happened but Snow attached late
+                setTimeout(initSnowPreference, 0);
+            } else {
+                // No snow.js on page; still apply UI state
+                initSnowPreference();
+            }
+        });
+
+        // Initialize
+        renderCalendar();
+        renderHabits();
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+            if (e.key === 'Enter' && document.getElementById('taskModal').classList.contains('show')) addTask();
+        });
+    </script>
+<script id="snowScript" src="{% static 'js/snow.js' %}" defer></script>
+</body>
+</html>
